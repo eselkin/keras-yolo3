@@ -16,7 +16,7 @@ from yolo3.utils import get_random_data
 def _main():
     annotation_path = 'train.txt'
     log_dir = 'logs/000/'
-    classes_path = 'model_data/voc_classes.txt'
+    classes_path = 'model_data/steele_classes.txt'
     anchors_path = 'model_data/yolo_anchors.txt'
     class_names = get_classes(classes_path)
     num_classes = len(class_names)
@@ -31,7 +31,6 @@ def _main():
     else:
         model = create_model(input_shape, anchors, num_classes,
             freeze_body=2, weights_path='model_data/yolo_weights.h5') # make sure you know what you freeze
-
     logging = TensorBoard(log_dir=log_dir)
     checkpoint = ModelCheckpoint(log_dir + 'ep{epoch:03d}-loss{loss:.3f}-val_loss{val_loss:.3f}.h5',
         monitor='val_loss', save_weights_only=True, save_best_only=True, period=3)
@@ -60,7 +59,7 @@ def _main():
                 steps_per_epoch=max(1, num_train//batch_size),
                 validation_data=data_generator_wrapper(lines[num_train:], batch_size, input_shape, anchors, num_classes),
                 validation_steps=max(1, num_val//batch_size),
-                epochs=50,
+                epochs=150,
                 initial_epoch=0,
                 callbacks=[logging, checkpoint])
         model.save_weights(log_dir + 'trained_weights_stage_1.h5')
@@ -70,6 +69,7 @@ def _main():
     if True:
         for i in range(len(model.layers)):
             model.layers[i].trainable = True
+        
         model.compile(optimizer=Adam(lr=1e-4), loss={'yolo_loss': lambda y_true, y_pred: y_pred}) # recompile to apply the change
         print('Unfreeze all of the layers.')
 
@@ -106,7 +106,7 @@ def create_model(input_shape, anchors, num_classes, load_pretrained=True, freeze
             weights_path='model_data/yolo_weights.h5'):
     '''create the training model'''
     K.clear_session() # get a new session
-    image_input = Input(shape=(None, None, 3))
+    image_input = Input(shape=(416, 416, 3), batch_shape=(32, 416,416,3))
     h, w = input_shape
     num_anchors = len(anchors)
 
@@ -114,6 +114,7 @@ def create_model(input_shape, anchors, num_classes, load_pretrained=True, freeze
         num_anchors//3, num_classes+5)) for l in range(3)]
 
     model_body = yolo_body(image_input, num_anchors//3, num_classes)
+    
     print('Create YOLOv3 model with {} anchors and {} classes.'.format(num_anchors, num_classes))
 
     if load_pretrained:
